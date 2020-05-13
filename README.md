@@ -47,3 +47,7 @@ Opções que devem considerar:
     ● -executable: procura por ficheiros executáveis.
     ● -mmin -60: procura ficheiros modificados há n minutos.
     ● -size +5M: procura os ficheiros com mais ou menos que x tamanho (megas)
+
+
+## License
+[MIT](https://choosealicense.com/licenses/mit/)
