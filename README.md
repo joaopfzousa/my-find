@@ -6,7 +6,7 @@ ficheiros e diretórios com base nas condições especificadas nos argumentos. O
 suporta a pesquisa por ficheiros, pasta, nome, data de criação, data de modificação, dono
 e permissões.
 
-                find [onde começar][[opções][o que procurar]
+                        find [onde começar][[opções][o que procurar]
 
 
 ## Requisitos
@@ -16,22 +16,22 @@ deve aceitar os argumentos anteriormente indicados e efetuar a pesquisa de todas
 ocorrências. A pesquisa deve ser feita com recurso a tarefas. Devem usar
 sincronização entre tarefas para garantir o bom funcionamento do “myfind”.
     
-        a. Devem fazer o parse dos argumentos.
+    a. Devem fazer o parse dos argumentos.
 
-        b. Devem ser criadas “n threads”, cada tarefa deve consumir um
+    b. Devem ser criadas “n threads”, cada tarefa deve consumir um
 diretório. Ao encontrar um novo directório a “thread” deve criar uma nova
 tarefa para consumir esse novo directório. Quando todas as tarefas
 concluírem a procura, a “main thread” deve saber quantas
 correspondências cada tarefa satisfez.
 
-        c. Devem ser criadas “n threads consumidoras”, e “1 thread
+    c. Devem ser criadas “n threads consumidoras”, e “1 thread
 produtoras”. A tarefa produtora deve produzir diretórios para serem
 consumidos pelas threads consumidoras. Quando uma tarefa consumidora
 acaba a procura no diretório corrente deve consultar se existe mais
 diretórios para consumir. Quando todas as tarefas concluírem a procura, a
 “main thread” deve saber quantas correspondências cada tarefa satisfez.
 
-        d. Devem ser criadas “n threads consumidoras”, e “n thread
+    d. Devem ser criadas “n threads consumidoras”, e “n thread
 produtoras”. Cada tarefa produtora deve produzir diretórios para serem
 consumidos pelas threads consumidoras. Quando uma tarefa consumidora
 acaba a procura no diretório corrente deve consultar se existe mais
