@@ -6,7 +6,7 @@ ficheiros e diretórios com base nas condições especificadas nos argumentos. O
 suporta a pesquisa por ficheiros, pasta, nome, data de criação, data de modificação, dono
 e permissões.
 
-                        find [onde começar][[opções][o que procurar]
+                                find [onde começar][[opções][o que procurar]
 
 
 ## Requisitos
