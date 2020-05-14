@@ -9,7 +9,6 @@
 #include <sys/stat.h>
 #include <string.h>
 
-
 void listDir(const char *name, int indent)
 {
     DIR *dir;
@@ -25,11 +24,9 @@ void listDir(const char *name, int indent)
         perror("opendir() error");
     else
     {
-        //puts("contents of root:");
         printf("\n\n%s\n", base_path);
         while ((entry = readdir(dir)) != NULL)
         {
-
             sprintf(path, "%s%s", base_path, entry->d_name);
             
             if (stat(path, &file_stat) == 0)
