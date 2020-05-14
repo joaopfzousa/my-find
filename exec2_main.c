@@ -5,9 +5,21 @@
 #undef _POSIX_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
-
 #include <sys/stat.h>
 #include <string.h>
+#include <unistd.h>
+
+#define MAX_CMD 100
+#define TRUE 1
+
+void prompt(){
+    char path[100];
+    getcwd(path, sizeof(path));
+
+    char *res;
+    res = strrchr(path, '/');
+    printf("%s$", res);
+}
 
 void listDir(const char *name, int indent)
 {
@@ -60,8 +72,37 @@ void listDir(const char *name, int indent)
     }
 }
 
+void read_command( char *cmd, char **arg_list)
+{
+    char *token;
+    int i = 0;
+    fgets(cmd, MAX_CMD, stdin);
+    cmd[strlen(cmd)-1] = '\0';
+    token = strtok(cmd, " ");
+    while (token != NULL)
+    {
+        arg_list[i++] = token;
+        token = strtok(NULL, " ");
+    }
+    arg_list[i] = NULL;
+}
+
 int main(int argc, char **argv)
 {
-    listDir("/Users/joaopfzousa/Documents/Faculdade/SO/", 0);
+    char cmd[MAX_CMD]; 
+    char *arg_list[5];
+    while (TRUE)
+    {
+        prompt();
+        read_command (cmd, arg_list);
+        
+        if(strcmp(arg_list[0], "find") == 0)
+        {
+            listDir("/Users/joaopfzousa/Documents/Faculdade/SO/", 0);
+        }else if(strcmp(arg_list[0], "clear") == 0)
+        {
+           printf("\033[H\033[J");
+        }
+    }
     return 0;
 }
