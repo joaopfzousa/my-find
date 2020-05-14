@@ -3,14 +3,11 @@
 #include <errno.h>
 #include <sys/types.h>
 #undef _POSIX_SOURCE
+#include <stdio.h>
 #include <stdlib.h>
 
 #include <sys/stat.h>
-#include <unistd.h>
-#include <dirent.h>
-#include <stdio.h>
 #include <string.h>
-
 
 
 void listDir(const char *name, int indent)
@@ -35,9 +32,6 @@ void listDir(const char *name, int indent)
 
             sprintf(path, "%s%s", base_path, entry->d_name);
             
-           
-
-            //printf("\n %s : %d\n", path, stat(path, &file_stat));
             if (stat(path, &file_stat) == 0)
             {
                 if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0 || strcmp(entry->d_name, ".DS_Store") == 0 || strcmp(entry->d_name, ".git") == 0)
