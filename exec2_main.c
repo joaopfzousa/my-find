@@ -124,23 +124,24 @@ int main(int argc, char **argv)
     char cmd[MAX_CMD]; 
     char *arg_list[5];
 
-    int i=0;
-
-	T_DATA t_data = { .args={NULL, ""}, .n_args=0 };
-
-    t_data.args[t_data.n_args].opt = name;
-	t_data.args[t_data.n_args].value = ".txt";
-	t_data.n_args++;
-
-	t_data.args[t_data.n_args].opt = type;
-	t_data.args[t_data.n_args].value = "f";
-	t_data.n_args++;
-
+    
     while (TRUE)
     {
         prompt();
         read_command (cmd, arg_list);
         
+        int i=0;
+
+        T_DATA t_data = { .args={NULL, ""}, .n_args=0 };
+
+        t_data.args[t_data.n_args].opt = name;
+        t_data.args[t_data.n_args].value = ".txt";
+        t_data.n_args++;
+
+        t_data.args[t_data.n_args].opt = type;
+        t_data.args[t_data.n_args].value = "f";
+        t_data.n_args++;
+
         if(strcmp(arg_list[0], "find") == 0)
         {
             listDir("/Users/joaopfzousa/Documents/Faculdade/SO/", 0);
@@ -160,6 +161,6 @@ int main(int argc, char **argv)
 		i == t_data.n_args ? printf("match\n") : printf("No match\n"); 
 
 	// end loop over entries
-    
+
     return 0;
 }
