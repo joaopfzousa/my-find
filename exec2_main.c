@@ -129,7 +129,7 @@ int main(int argc, char **argv)
     {
         prompt();
         read_command (cmd, arg_list);
-        
+
         int i=0;
 
         T_DATA t_data = { .args={NULL, ""}, .n_args=0 };
@@ -144,23 +144,23 @@ int main(int argc, char **argv)
 
         if(strcmp(arg_list[0], "find") == 0)
         {
+
+        // Loop over entries
+
+            // for each entry
+            for (i=0 ; i<t_data.n_args ; i++)
+                if (!t_data.args[i].opt(/*entry,*/ t_data.args[i].value))
+                    break;
+
+            i == t_data.n_args ? printf("match\n") : printf("No match\n"); 
+
+        // end loop over entries
             listDir("/Users/joaopfzousa/Documents/Faculdade/SO/", 0);
         }else if(strcmp(arg_list[0], "clear") == 0)
         {
            printf("\033[H\033[J");
         }
     }
-
-    // Loop over entries
-
-		// for each entry
-		for (i=0 ; i<t_data.n_args ; i++)
-			if (!t_data.args[i].opt(/*entry,*/ t_data.args[i].value))
-				break;
-
-		i == t_data.n_args ? printf("match\n") : printf("No match\n"); 
-
-	// end loop over entries
 
     return 0;
 }
