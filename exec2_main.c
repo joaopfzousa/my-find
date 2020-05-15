@@ -12,6 +12,38 @@
 #define MAX_CMD 100
 #define TRUE 1
 
+typedef int (*PARAM)(/*struct dirent * entry,*/ char * value);
+
+typedef struct arg {
+    PARAM opt;
+    char * value;
+}ARG;
+
+typedef struct thread_data {
+	//path
+	//...
+    ARG args[50];
+    int n_args;
+}T_DATA;
+
+
+int name (/*struct dirent * entry,*/ char * value) {
+    printf("Find by name: %s\n", value);
+
+    //todo
+
+    return 1; // return 1 if match found
+}
+
+int type (/*struct dirent * entry,*/ char * value) {
+    printf("Find by type: %s\n", value);
+
+    //todo
+
+    return 1; // return 1 if match found
+}
+
+
 void prompt(){
     char path[100];
     getcwd(path, sizeof(path));
@@ -91,6 +123,19 @@ int main(int argc, char **argv)
 {
     char cmd[MAX_CMD]; 
     char *arg_list[5];
+
+    int i=0;
+
+	T_DATA t_data = { .args={NULL, ""}, .n_args=0 };
+
+    t_data.args[t_data.n_args].opt = name;
+	t_data.args[t_data.n_args].value = ".txt";
+	t_data.n_args++;
+
+	t_data.args[t_data.n_args].opt = type;
+	t_data.args[t_data.n_args].value = "f";
+	t_data.n_args++;
+
     while (TRUE)
     {
         prompt();
@@ -104,5 +149,17 @@ int main(int argc, char **argv)
            printf("\033[H\033[J");
         }
     }
+
+    // Loop over entries
+
+		// for each entry
+		for (i=0 ; i<t_data.n_args ; i++)
+			if (!t_data.args[i].opt(/*entry,*/ t_data.args[i].value))
+				break;
+
+		i == t_data.n_args ? printf("match\n") : printf("No match\n"); 
+
+	// end loop over entries
+    
     return 0;
 }
