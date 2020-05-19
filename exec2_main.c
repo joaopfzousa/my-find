@@ -12,7 +12,7 @@
 #define MAX_CMD 100
 #define TRUE 1
 
-typedef int (*PARAM)(/*struct dirent * entry,*/ char * value);
+typedef int (*PARAM)(struct dirent * entry, char * value);
 
 typedef struct arg {
     PARAM opt;
@@ -27,7 +27,7 @@ typedef struct thread_data {
 }T_DATA;
 
 
-int name (/*struct dirent * entry,*/ char * value) {
+int name (struct dirent * entry, char * value) {
     printf("Find by name: %s\n", value);
 
     //todo
@@ -35,8 +35,48 @@ int name (/*struct dirent * entry,*/ char * value) {
     return 1; // return 1 if match found
 }
 
-int type (/*struct dirent * entry,*/ char * value) {
+int type (struct dirent * entry, char * value) {
     printf("Find by type: %s\n", value);
+
+    //todo
+
+    return 1; // return 1 if match found
+}
+
+int iname (struct dirent * entry, char * value) {
+    printf("Find by iname: %s\n", value);
+
+    //todo
+
+    return 1; // return 1 if match found
+}
+
+int empty (struct dirent * entry, char * value) {
+    printf("Find by empty: %s\n", value);
+
+    //0 -> ficheiros / 64 -> diretórios
+
+    return 1; // return 1 if match found
+}
+
+int executable (struct dirent * entry, char * value) {
+    printf("Find by executable: %s\n", value);
+
+    //todo
+
+    return 1; // return 1 if match found
+}
+
+int mmin (struct dirent * entry, char * value) {
+    printf("Find by mmin: %s\n", value);
+
+    //todo
+
+    return 1; // return 1 if match found
+}
+
+int size (struct dirent * entry, char * value) {
+    printf("Find by size: %s\n", value);
 
     //todo
 
@@ -53,7 +93,7 @@ void prompt(){
     printf("%s$", res);
 }
 
-void listDir(const char *name, int indent)
+void listDir(const char *name)
 {
     DIR *dir;
     struct dirent *entry;
@@ -78,6 +118,12 @@ void listDir(const char *name, int indent)
                 if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0 || strcmp(entry->d_name, ".DS_Store") == 0 || strcmp(entry->d_name, ".git") == 0)
                     continue;
 
+                for (int i=0 ; i<t_data.n_args ; i++)
+                    if (!t_data.args[i].opt(path, t_data.args[i].value))
+                        break;
+
+                i == t_data.n_args ? printf("match\n") : printf("No match\n"); 
+
                 printf((S_ISDIR(file_stat.st_mode)) ? "d" : "-");
                 
                 printf((file_stat.st_mode & S_IRUSR) ? "r" : "-");
@@ -95,7 +141,7 @@ void listDir(const char *name, int indent)
                 if(S_ISDIR(file_stat.st_mode))
                 {
                     sprintf(path, "%s/", path);
-                    listDir(path, 0);
+                    listDir(path);
                 }
             } 
             strcpy(path, "");
@@ -104,19 +150,56 @@ void listDir(const char *name, int indent)
     }
 }
 
-void read_command( char *cmd, char **arg_list)
+void remove_all_chars(char* str, char c) {
+    char *pr = str, *pw = str;
+    while (*pr) {
+        *pw = *pr++;
+        pw += (*pw != c);
+    }
+    *pw = '\0';
+}
+
+
+T_DATA read_command( char *cmd, char **arg_list)
 {
     char *token;
     int i = 0;
     fgets(cmd, MAX_CMD, stdin);
     cmd[strlen(cmd)-1] = '\0';
     token = strtok(cmd, " ");
-    while (token != NULL)
+
+    if(strcmp(token, "find") == 0 )
     {
-        arg_list[i++] = token;
+        arg_list[0] = token;
+        token = strtok(NULL, " ");
+        arg_list[1] = token;
         token = strtok(NULL, " ");
     }
-    arg_list[i] = NULL;
+
+    T_DATA t_data = { .args={NULL, ""}, .n_args=0 };
+    while (token != NULL)
+    {    
+        if(strcmp(token, "-name") == 0 || strcmp(token, "-iname") == 0 || strcmp(token, "-type") == 0 || strcmp(token, "-empty") == 0|| strcmp(token, "-executable") == 0 || strcmp(token, "-mmin") == 0 || strcmp(token, "-size") == 0)
+        {
+            remove_all_chars(token, '-');
+            //printf("token option = %s\n", token);
+            t_data.args[t_data.n_args].opt = (PARAM) token;
+
+            if(strcmp(token, "empty") == 0 || strcmp(token, "executable") == 0 )
+            {
+                t_data.args[t_data.n_args].value = NULL;
+                 //printf("token  value = %s\n", t_data.args[t_data.n_args].value);
+            }else{
+                token = strtok(NULL, " ");
+                //printf("token  value = %s\n", token);
+                t_data.args[t_data.n_args].value = token;
+            }
+            t_data.n_args++;
+        }
+        token = strtok(NULL, " ");
+    }
+
+    return t_data;
 }
 
 int main(int argc, char **argv)
@@ -128,34 +211,25 @@ int main(int argc, char **argv)
     while (TRUE)
     {
         prompt();
-        read_command (cmd, arg_list);
+        T_DATA t_data = { .args={NULL, ""}, .n_args=0 };
+        t_data = read_command (cmd, arg_list);
 
         int i=0;
-
-        T_DATA t_data = { .args={NULL, ""}, .n_args=0 };
-
-        t_data.args[t_data.n_args].opt = name;
-        t_data.args[t_data.n_args].value = ".txt";
-        t_data.n_args++;
-
-        t_data.args[t_data.n_args].opt = type;
-        t_data.args[t_data.n_args].value = "f";
-        t_data.n_args++;
-
         if(strcmp(arg_list[0], "find") == 0)
-        {
+        {            
+            char *caminho = arg_list[1];
+       
+            listDir(caminho);
+            // Loop over entries
 
-        // Loop over entries
-
+            
             // for each entry
-            for (i=0 ; i<t_data.n_args ; i++)
-                if (!t_data.args[i].opt(/*entry,*/ t_data.args[i].value))
-                    break;
-
-            i == t_data.n_args ? printf("match\n") : printf("No match\n"); 
+            
+           
+            
 
         // end loop over entries
-            listDir("/Users/joaopfzousa/Documents/Faculdade/SO/", 0);
+            //listDir("/Users/joaopfzousa/Documents/Faculdade/SO/", 0);
         }else if(strcmp(arg_list[0], "clear") == 0)
         {
            printf("\033[H\033[J");
