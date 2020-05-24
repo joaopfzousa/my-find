@@ -27,10 +27,20 @@ typedef struct arg {
 
 typedef struct thread_data {
 	char * base_path;
-	//...
     ARG args[50];
     int n_args;
 }T_DATA;
+
+typedef struct occur {
+	int tid;
+    struct occurrences *pnext;
+    struct paths;
+}OCCUR;
+
+typedef struct paths {
+	char * base_path;
+    struct path *pnext;
+}PATHS;
 
 
 int name (struct dirent * entry, char * value) 
