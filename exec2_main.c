@@ -33,12 +33,13 @@ typedef struct thread_data {
 }T_DATA;
 
 
-int name (struct dirent * entry, char * value) {
-    printf("Find by name: %s\n", value);
-
-    //todo
-
-    return 1; // return 1 if match found
+int name (struct dirent * entry, char * value) 
+{
+    if(strcmp(value , entry->d_name) == 0)
+    {
+        return 1; // return 1 if match found
+    }
+    return 0; // return 1 if match not found
 }
 
 int type (struct dirent * entry, char * value) {
@@ -97,7 +98,7 @@ T_DATA read_command( char *cmd, char **arg_list)
     cmd[strlen(cmd)-1] = '\0';
     token = strtok(cmd, " ");
 
-    T_DATA t_data = { .args={NULL, ""}, .n_args=0 };
+    T_DATA t_data;
     if(strcmp(token, "find") == 0 )
     {
         arg_list[0] = token;
@@ -112,17 +113,34 @@ T_DATA read_command( char *cmd, char **arg_list)
         if(strcmp(token, "-name") == 0 || strcmp(token, "-iname") == 0 || strcmp(token, "-type") == 0 || strcmp(token, "-empty") == 0|| strcmp(token, "-executable") == 0 || strcmp(token, "-mmin") == 0 || strcmp(token, "-size") == 0)
         {
             remove_all_chars(token, '-');
-            //printf("token option = %s\n", token);
-            t_data.args[t_data.n_args].opt = (PARAM) token;
+
+            if(strcmp(token, "name") == 0)
+            {
+                t_data.args[t_data.n_args].opt = name;
+            }else if(strcmp(token, "iname") == 0){
+                t_data.args[t_data.n_args].opt = iname;
+            }else if(strcmp(token, "type") == 0){
+                t_data.args[t_data.n_args].opt = type;
+            }else if(strcmp(token, "empty") == 0){
+                t_data.args[t_data.n_args].opt = empty;
+            }else if(strcmp(token, "executable") == 0){
+                t_data.args[t_data.n_args].opt = executable;
+            }else if(strcmp(token, "mmin") == 0){
+                t_data.args[t_data.n_args].opt = mmin;
+            }else if(strcmp(token, "size") == 0){
+                t_data.args[t_data.n_args].opt = size;
+            }
+
+            //printf("t_data.args[%d].opt = %s\n", t_data.n_args, t_data.args[t_data.n_args].opt);
 
             if(strcmp(token, "empty") == 0 || strcmp(token, "executable") == 0 )
             {
                 t_data.args[t_data.n_args].value = NULL;
-                 //printf("token  value = %s\n", t_data.args[t_data.n_args].value);
+                //printf("t_data.args[%d].value = %s\n", t_data.n_args, t_data.args[t_data.n_args].value);
             }else{
                 token = strtok(NULL, " ");
-                //printf("token  value = %s\n", token);
                 t_data.args[t_data.n_args].value = token;
+                //printf("t_data.args[%d].value = %s\n", t_data.n_args, t_data.args[t_data.n_args].value);
             }
             t_data.n_args++;
         }
@@ -160,12 +178,12 @@ int main(int argc, char **argv)
 
 void * listDir(void * param)
 {
-    struct thread_data *my_data;
+    struct thread_data * my_data;
     my_data = (struct thread_data *) param;
 
     T_DATA thread_data[20];
     pthread_t thread_id[20];
-    int i = 0;
+    int i = 0, j = 0;
 
     DIR *dir;
     struct dirent *entry;
@@ -188,7 +206,26 @@ void * listDir(void * param)
 
         if (stat(path, &file_stat) == 0)
         {
+            for (j = 0; j < my_data->n_args; j++)
+            {
+                //printf("my_data->n_args = %d\n", my_data->n_args);
+                //printf("j = %d\n", j);
+                //printf("my_data->args[%d].opt = %s\n", j, my_data->args[j].opt);
+                //printf("my_data->args[%d].value = %s\n", j, my_data->args[j].value);
 
+                if (!my_data->args[j].opt(entry, my_data->args[j].value))
+                    break;
+            }
+           
+            if(j == my_data->n_args)
+            {
+                //printf("match\n");
+            } else {
+                //printf("No match\n");
+            }
+            
+                
+            /*
             printf((S_ISDIR(file_stat.st_mode)) ? "d" : "-");
             
             printf((file_stat.st_mode & S_IRUSR) ? "r" : "-");
@@ -202,7 +239,8 @@ void * listDir(void * param)
             printf((file_stat.st_mode & S_IXOTH) ? "x" : "-");
 
             printf(" %u\t%lld\t%s\n", file_stat.st_uid, file_stat.st_size, entry->d_name);
-
+            */
+           
             if(S_ISDIR(file_stat.st_mode))
             {
                 path = strcat(path, "/");
