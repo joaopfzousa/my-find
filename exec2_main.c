@@ -9,14 +9,14 @@
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
-
+#include <ctype.h>
 
 #define MAX_CMD 100
 #define TRUE 1
 
 void * listDir(void * param);
 void remove_all_chars(char* str, char c);
-void prompt();
+void prompt(void);
 
 typedef int (*PARAM)(struct dirent * entry, char * value);
 
@@ -26,26 +26,147 @@ typedef struct arg {
 }ARG;
 
 typedef struct thread_data {
-	char * base_path;
+    char * base_path;
     ARG args[50];
     int n_args;
 }T_DATA;
 
-typedef struct occur {
-	int tid;
-    struct occurrences *pnext;
-    struct paths;
-}OCCUR;
-
 typedef struct paths {
-	char * base_path;
-    struct path *pnext;
+    char *base_path;
+    struct paths *pnext;
 }PATHS;
 
+typedef struct occur {
+    pthread_t thread_id;
+    PATHS *pfirst;
+    int n_paths;
+    struct occur *pnext;
+}OCCUR;
 
-int name (struct dirent * entry, char * value) 
+
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+OCCUR  occurrences = {.thread_id = NULL, .pnext = NULL, .pfirst = NULL, .n_paths = 0};
+
+
+PATHS * aloc_memory_path(char* path)
 {
-    if(strcmp(value , entry->d_name) == 0)
+    //printf("Aloquei memoria path\n");
+    PATHS* new = (PATHS*) malloc(sizeof(PATHS));
+    new->pnext = NULL;
+    new->base_path = (char *) malloc(sizeof(char) * strlen(path));
+    strcpy(new->base_path, path);
+   return new;
+}
+
+/*
+OCCUR * aloc_memory_occur()
+{
+    //printf("Aloquei memoria occur\n");
+    OCCUR* new = (OCCUR*) malloc(sizeof(OCCUR));
+    new->path = NULL;
+    new->thread = 0;
+    new->n_paths = 0;
+    new->pnext = NULL;
+   return new;
+}
+*/
+
+void insert_occur(pthread_t thread, char* path)
+{
+    printf("occurrences.n_paths = %d\n", occurrences.n_paths);
+
+    PATHS * new =  aloc_memory_path(path);
+      
+    //primeira inserçãp
+    if(occurrences.n_paths == 0)
+    {
+        printf("Inseri 1\n");
+        occurrences.thread_id = thread;
+        occurrences.pfirst = new;
+        occurrences.n_paths += 1;
+        occurrences.pnext = NULL;
+        return;
+    }else if(occurrences.n_paths != 0 && occurrences.pnext == NULL)
+    {
+        OCCUR temp = occurrences;
+        while(temp.pnext != NULL)
+        {
+            if(pthread_equal(temp.thread_id , thread))
+            {
+                printf("Inseri 2 same\n");
+                PATHS * temp_lastPath = temp.pfirst;
+                temp_lastPath->pnext = NULL;
+                temp.pfirst = new;
+                new->pnext = temp_lastPath;
+                temp.n_paths++;
+                return;
+            }
+        }
+        
+        printf("Inseri 2 new\n");
+        OCCUR * new_occur = (OCCUR*) malloc(sizeof(OCCUR));
+        new_occur->thread_id = thread;
+        new_occur->pfirst = new;
+        new_occur->n_paths++;
+        new_occur->pnext = NULL;
+        
+        temp.pnext = new_occur;
+    }
+    
+    //find /Users/joaopfzousa/Documents/Faculdade/SO/ -name list_dir.c
+    
+    //Depois da primeira inserção
+    OCCUR *temp = occurrences.pnext;
+    
+    while(temp != NULL)
+    {
+        printf("entrei");
+        if(pthread_equal(temp->thread_id , thread))
+        {
+            printf("Inseri 2 same\n");
+            PATHS * temp_lastPath = temp->pfirst;
+            temp_lastPath->pnext = NULL;
+            temp->pfirst = new;
+            new->pnext = temp_lastPath;
+            temp->n_paths++;
+            return;
+        }
+        temp = temp->pnext;
+    }
+    
+    printf("Inseri 2 new\n");
+    OCCUR * new_occur = (OCCUR*) malloc(sizeof(OCCUR));
+    new_occur->thread_id = thread;
+    new_occur->pfirst = new;
+    new_occur->n_paths++;
+    new_occur->pnext = NULL;
+    
+    temp = new_occur;
+}
+
+void print_occur()
+{
+
+    puts("entrei print");
+        
+    OCCUR temp = occurrences;
+
+    while(temp.pnext != NULL)
+    {
+        PATHS * temp_newPath = temp.pfirst;
+        while(temp_newPath != NULL)
+        {
+            printf("[%lu] -> %s\n", temp.thread_id, temp_newPath->base_path);
+            temp_newPath = temp_newPath->pnext;
+        }
+        temp = temp;
+    }
+}
+
+
+int name (struct dirent * entry, char * value)
+{
+    if(strstr(value , entry->d_name) != NULL)
     {
         return 1; // return 1 if match found
     }
@@ -103,12 +224,11 @@ int size (struct dirent * entry, char * value) {
 T_DATA read_command( char *cmd, char **arg_list)
 {
     char *token;
-    int i = 0;
     fgets(cmd, MAX_CMD, stdin);
     cmd[strlen(cmd)-1] = '\0';
     token = strtok(cmd, " ");
 
-    T_DATA t_data;
+    T_DATA t_data = { .args={NULL, ""}, .n_args=0 };
     if(strcmp(token, "find") == 0 )
     {
         arg_list[0] = token;
@@ -119,7 +239,7 @@ T_DATA read_command( char *cmd, char **arg_list)
     }
     
     while (token != NULL)
-    {    
+    {
         if(strcmp(token, "-name") == 0 || strcmp(token, "-iname") == 0 || strcmp(token, "-type") == 0 || strcmp(token, "-empty") == 0|| strcmp(token, "-executable") == 0 || strcmp(token, "-mmin") == 0 || strcmp(token, "-size") == 0)
         {
             remove_all_chars(token, '-');
@@ -162,7 +282,7 @@ T_DATA read_command( char *cmd, char **arg_list)
 
 int main(int argc, char **argv)
 {
-    char cmd[MAX_CMD]; 
+    char cmd[MAX_CMD];
     char *arg_list[5];
 
     while (TRUE)
@@ -171,13 +291,13 @@ int main(int argc, char **argv)
         T_DATA thread_data;
         pthread_t thread_id;
         thread_data = read_command (cmd, arg_list);
-        int i=0;
 
         if(strcmp(arg_list[0], "find") == 0)
-        {            
+        {
             pthread_create(&thread_id, NULL, &listDir, &thread_data);
             pthread_join(thread_id, NULL);
-                
+
+            print_occur();
         }else if(strcmp(arg_list[0], "clear") == 0)
         {
            printf("\033[H\033[J");
@@ -190,6 +310,8 @@ void * listDir(void * param)
 {
     struct thread_data * my_data;
     my_data = (struct thread_data *) param;
+
+    //printf(" my_data->n_args = %d\n", my_data->n_args);
 
     T_DATA thread_data[20];
     pthread_t thread_id[20];
@@ -218,20 +340,19 @@ void * listDir(void * param)
         {
             for (j = 0; j < my_data->n_args; j++)
             {
-                //printf("my_data->n_args = %d\n", my_data->n_args);
-                //printf("j = %d\n", j);
-                //printf("my_data->args[%d].opt = %s\n", j, my_data->args[j].opt);
-                //printf("my_data->args[%d].value = %s\n", j, my_data->args[j].value);
-
+                
                 if (!my_data->args[j].opt(entry, my_data->args[j].value))
                     break;
             }
+            //printf("j = %d\n",j);
+            //printf("my_data->n_args = %d\n",my_data->n_args);
+
            
             if(j == my_data->n_args)
             {
-                //printf("match\n");
-            } else {
-                //printf("No match\n");
+                pthread_mutex_lock(&mutex);
+                insert_occur(pthread_self(), path);
+                pthread_mutex_unlock(&mutex);
             }
             
                 
@@ -257,6 +378,11 @@ void * listDir(void * param)
 
                 thread_data[i].base_path = malloc(sizeof(char) * 300);
                 strcpy(thread_data[i].base_path, path);
+                thread_data[i].n_args = my_data->n_args;
+                for(int x = 0; x < my_data->n_args; x++)
+                {
+                    thread_data[i].args[x] = my_data->args[x];
+                }
                 pthread_create(&thread_id[i], NULL, &listDir, &thread_data[i]);
                 i++ ;
             }
