@@ -146,13 +146,15 @@ int name (struct dirent * entry, char * value, struct stat file_stat)
     return 0; // return 1 if match not found
 }
 
-int type (struct dirent * entry, char * value, struct stat file_stat) {
+int type (struct dirent * entry, char * value, struct stat file_stat) 
+{
     char * new;
-    
-    if(S_ISDIR(file_stat.st_mode)){
+
+    if(S_ISDIR(file_stat.st_mode))
+    {
         new = "d";
     } else{
-      new = "f";
+        new = "f";
     }
     
     if(strcmp(value, new) == 0)
@@ -171,20 +173,32 @@ int iname (struct dirent * entry, char * value, struct stat file_stat) {
     return 1; // return 1 if match found
 }
 
-int empty (struct dirent * entry, char * value, struct stat file_stat) {
-    printf("Find by empty: %s\n", value);
-
-    //0 -> ficheiros / 64 -> diretórios
-
-    return 1; // return 1 if match found
+int empty (struct dirent * entry, char * value, struct stat file_stat) 
+{
+    //printf("Find by empty: %s\n", value);
+     if(S_ISDIR(file_stat.st_mode)){
+        if(file_stat.st_size == 64)
+        {
+            return 1; // return 1 if match found
+        }
+    } else{
+        if(file_stat.st_size == 0)
+        {
+            return 1; // return 1 if match found
+        }
+    }
+    return 0; // return 0 if match not found
 }
 
 int executable (struct dirent * entry, char * value, struct stat file_stat) {
     printf("Find by executable: %s\n", value);
 
-    //todo
+    if((file_stat.st_mode & S_IXUSR) && (file_stat.st_mode & S_IXGRP) && (file_stat.st_mode & S_IXOTH))
+    {
+        return 1; // return 1 if match found
+    }
 
-    return 1; // return 1 if match found
+    return 0; // return 0 if match not found
 }
 
 int mmin (struct dirent * entry, char * value, struct stat file_stat) {
@@ -254,7 +268,7 @@ int main(int argc, char *argv[])
     T_DATA thread_data;
     pthread_t thread_id;    
     thread_data = read_command (argc, argv);
-    
+
     pthread_create(&thread_id, NULL, &listDir, &thread_data);
     pthread_join(thread_id, NULL);
 
