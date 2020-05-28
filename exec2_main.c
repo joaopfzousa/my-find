@@ -16,7 +16,6 @@
 
 void * listDir(void * param);
 void remove_all_chars(char* str, char c);
-void prompt(void);
 
 typedef int (*PARAM)(struct dirent * entry, char * value, struct stat file_stat);
 
@@ -204,112 +203,62 @@ int size (struct dirent * entry, char * value, struct stat file_stat) {
     return 1; // return 1 if match found
 }
 
-T_DATA read_command( char *cmd, char **arg_list)
+T_DATA read_command(int n_args, char **arg_list)
 {
-    char *token;
-    fgets(cmd, MAX_CMD, stdin);
-    cmd[strlen(cmd)-1] = '\0';
-    token = strtok(cmd, " ");
-
     T_DATA t_data = { .args={NULL, ""}, .n_args=0 };
-    if(strcmp(token, "find") == 0 )
-    {
-        arg_list[0] = token;
-        token = strtok(NULL, " ");
-        t_data.base_path = malloc(sizeof(char) * 300);
-        t_data.base_path = token;
-        token = strtok(NULL, " ");
-    }
-    
-    while (token != NULL)
-    {
-        if(strcmp(token, "-name") == 0 || strcmp(token, "-iname") == 0 || strcmp(token, "-type") == 0 || strcmp(token, "-empty") == 0|| strcmp(token, "-executable") == 0 || strcmp(token, "-mmin") == 0 || strcmp(token, "-size") == 0)
-        {
-            remove_all_chars(token, '-');
 
-            if(strcmp(token, "name") == 0)
+    t_data.base_path = malloc(sizeof(char) * 300);
+    t_data.base_path = arg_list[1];
+    //printf("base_path = %s\n", arg_list[1]);
+   
+    for(int k = 2; k < n_args; k++)
+    {
+        if(strcmp(arg_list[k], "-name") == 0 || strcmp(arg_list[k], "-iname") == 0 || strcmp(arg_list[k], "-type") == 0 || strcmp(arg_list[k], "-empty") == 0|| strcmp(arg_list[k], "-executable") == 0 || strcmp(arg_list[k], "-mmin") == 0 || strcmp(arg_list[k], "-size") == 0)
+        {
+            remove_all_chars(arg_list[k], '-');
+
+            if(strcmp(arg_list[k], "name") == 0)
             {
                 t_data.args[t_data.n_args].opt = (PARAM) name;
-            }else if(strcmp(token, "iname") == 0){
+            }else if(strcmp(arg_list[k], "iname") == 0){
                 t_data.args[t_data.n_args].opt = (PARAM) iname;
-            }else if(strcmp(token, "type") == 0){
+            }else if(strcmp(arg_list[k], "type") == 0){
                 t_data.args[t_data.n_args].opt = (PARAM) type;
-            }else if(strcmp(token, "empty") == 0){
+            }else if(strcmp(arg_list[k], "empty") == 0){
                 t_data.args[t_data.n_args].opt =  (PARAM) empty;
-            }else if(strcmp(token, "executable") == 0){
+            }else if(strcmp(arg_list[k], "executable") == 0){
                 t_data.args[t_data.n_args].opt = (PARAM) executable;
-            }else if(strcmp(token, "mmin") == 0){
+            }else if(strcmp(arg_list[k], "mmin") == 0){
                 t_data.args[t_data.n_args].opt = (PARAM) mmin;
-            }else if(strcmp(token, "size") == 0){
+            }else if(strcmp(arg_list[k], "size") == 0){
                 t_data.args[t_data.n_args].opt = (PARAM) size;
             }
-
-            //printf("t_data.args[%d].opt = %s\n", t_data.n_args, t_data.args[t_data.n_args].opt);
-
-            if(strcmp(token, "empty") == 0 || strcmp(token, "executable") == 0 )
+            //printf("t_data.args[%d].opt = %s\n", t_data.n_args, arg_list[k]);
+            if(strcmp(arg_list[k], "empty") == 0 || strcmp(arg_list[k], "executable") == 0 )
             {
                 t_data.args[t_data.n_args].value = NULL;
                 //printf("t_data.args[%d].value = %s\n", t_data.n_args, t_data.args[t_data.n_args].value);
             }else{
-                token = strtok(NULL, " ");
-                t_data.args[t_data.n_args].value = token;
+                k++;
+                t_data.args[t_data.n_args].value = arg_list[k];
                 //printf("t_data.args[%d].value = %s\n", t_data.n_args, t_data.args[t_data.n_args].value);
             }
             t_data.n_args++;
         }
-        token = strtok(NULL, " ");
     }
-
     return t_data;
 }
 
-void freeList(OCCUR* head)
+int main(int argc, char *argv[])
 {
-   OCCUR* tmp;
+    T_DATA thread_data;
+    pthread_t thread_id;    
+    thread_data = read_command (argc, argv);
+    
+    pthread_create(&thread_id, NULL, &listDir, &thread_data);
+    pthread_join(thread_id, NULL);
 
-    while (head != NULL)
-    {
-        tmp = head;
-        
-        PATHS* tmpHeadPaths= tmp->pfirst;
-        PATHS* tmpPaths;
-        while(tmpHeadPaths != NULL)
-        {
-            tmpPaths = tmpHeadPaths;
-            tmpHeadPaths = tmpHeadPaths->pnext;
-            free(tmpPaths);
-        }
-        
-        head = head->pnext;
-        free(tmp);
-    }
-}
-
-int main(int argc, char **argv)
-{
-    char cmd[MAX_CMD];
-    char *arg_list[5];
-
-    while (TRUE)
-    {
-        prompt();
-        T_DATA thread_data;
-        pthread_t thread_id;
-        thread_data = read_command (cmd, arg_list);
-
-        if(strcmp(arg_list[0], "find") == 0)
-        {
-            pthread_create(&thread_id, NULL, &listDir, &thread_data);
-            pthread_join(thread_id, NULL);
-
-            print_occur();
-            freeList(&occurrences);
-            
-        }else if(strcmp(arg_list[0], "clear") == 0)
-        {
-           printf("\033[H\033[J");
-        }
-    }
+    print_occur();    
     return 0;
 }
 
@@ -411,13 +360,4 @@ void remove_all_chars(char* str, char c) {
         pw += (*pw != c);
     }
     *pw = '\0';
-}
-
-void prompt(){
-    char path[100];
-    getcwd(path, sizeof(path));
-
-    char *res;
-    res = strrchr(path, '/');
-    printf("%s$", res);
 }
