@@ -3,16 +3,26 @@
 #include <errno.h>
 #include <sys/types.h>
 #undef _POSIX_SOURCE
+
+#include <pthread.h>
+#include <mach/mach_init.h>
+#include <mach/semaphore.h>
+#include <mach/task.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <string.h>
-#include <unistd.h>
-#include <pthread.h>
 #include <ctype.h>
 
+#define N 10
+#define NProds 1
+#define NCons 6
 #define MAX_CMD 100
 #define TRUE 1
+
+
+
 
 void * listDir(void * param);
 void remove_all_chars(char* str, char c);
@@ -26,8 +36,6 @@ typedef struct arg {
 
 typedef struct thread_data {
     char * base_path;
-    ARG args[50];
-    int n_args;
 }T_DATA;
 
 typedef struct paths {
@@ -42,19 +50,23 @@ typedef struct occur {
     struct occur *pnext;
 }OCCUR;
 
+char *buf[N];
+int prodptr=0, consptr=0;
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 OCCUR  occurrences = {.thread_id = NULL, .pnext = NULL, .pfirst = NULL, .n_paths = 0};
 
+ARG args[5];
+int n_args;
 
-PATHS * aloc_memory_path(char* path)
-{
-    PATHS* new = (PATHS*) malloc(sizeof(PATHS));
-    new->pnext = NULL;
-    new->base_path = (char *) malloc(sizeof(char) * strlen(path));
-    strcpy(new->base_path, path);
-    return new;
-}
+pthread_mutex_t trinco_p = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t trinco_c = PTHREAD_MUTEX_INITIALIZER;
+
+static const char *semNameProd = "semPodeProd";
+semaphore_t semPodeProd;
+
+static const char *semNameCons = "semPodeCons";
+semaphore_t semPodeCons;
 
 void insert_occur(pthread_t thread, char* path)
 {
@@ -64,7 +76,6 @@ void insert_occur(pthread_t thread, char* path)
     //primeira inserçãp
     if(occurrences.n_paths == 0)
     {
-        //printf("Inseri 1\n");
         occurrences.thread_id = thread;
         occurrences.pfirst = new;
         occurrences.n_paths += 1;
@@ -85,13 +96,14 @@ void insert_occur(pthread_t thread, char* path)
             PATHS * temp_firstPath = temp->pfirst;
             temp->pfirst = new;
             new->pnext = temp_firstPath;
+
             temp->n_paths++;
             return;
         }
         temp = temp->pnext;
     }
 
-    //não é igaul, nova ocurrencia 
+    //não é igual, nova ocurrência
     OCCUR * new_occur = (OCCUR*) malloc(sizeof(OCCUR));
     new_occur->thread_id = thread;
     new_occur->pfirst = new;
@@ -101,20 +113,13 @@ void insert_occur(pthread_t thread, char* path)
     temp->pnext = new_occur;
 }
 
-void print_occur()
+PATHS * aloc_memory_path(char* path)
 {
-    OCCUR *temp = &occurrences;
-
-    while(temp != NULL)
-    {
-        PATHS * temp_newPath = temp->pfirst;
-        while(temp_newPath != NULL)
-        {
-            printf("[%lu] -> %s\n", temp->thread_id, temp_newPath->base_path);
-            temp_newPath = temp_newPath->pnext;
-        }
-        temp = temp->pnext;
-    }
+    PATHS* new = (PATHS*) malloc(sizeof(PATHS));
+    new->pnext = NULL;
+    new->base_path = (char *) malloc(sizeof(char) * strlen(path));
+    strcpy(new->base_path, path);
+   return new;
 }
 
 
@@ -202,7 +207,7 @@ int size (struct dirent * entry, char * value, struct stat file_stat)
 
 T_DATA read_command(int n_args, char **arg_list)
 {
-    T_DATA t_data = { .args={NULL, ""}, .n_args=0 };
+    T_DATA t_data;
 
     t_data.base_path = malloc(sizeof(char) * 300);
     t_data.base_path = arg_list[1];
@@ -215,53 +220,86 @@ T_DATA read_command(int n_args, char **arg_list)
 
             if(strcmp(arg_list[k], "name") == 0)
             {
-                t_data.args[t_data.n_args].opt = (PARAM) name;
+                args[n_args].opt = (PARAM) name;
             }else if(strcmp(arg_list[k], "iname") == 0){
-                t_data.args[t_data.n_args].opt = (PARAM) iname;
+                args[n_args].opt = (PARAM) iname;
             }else if(strcmp(arg_list[k], "type") == 0){
-                t_data.args[t_data.n_args].opt = (PARAM) type;
+                args[n_args].opt = (PARAM) type;
             }else if(strcmp(arg_list[k], "empty") == 0){
-                t_data.args[t_data.n_args].opt =  (PARAM) empty;
+                args[n_args].opt =  (PARAM) empty;
             }else if(strcmp(arg_list[k], "executable") == 0){
-                t_data.args[t_data.n_args].opt = (PARAM) executable;
+                args[n_args].opt = (PARAM) executable;
             }else if(strcmp(arg_list[k], "mmin") == 0){
-                t_data.args[t_data.n_args].opt = (PARAM) mmin;
+                args[n_args].opt = (PARAM) mmin;
             }else if(strcmp(arg_list[k], "size") == 0){
-                t_data.args[t_data.n_args].opt = (PARAM) size;
+                args[n_args].opt = (PARAM) size;
             }
             if(strcmp(arg_list[k], "empty") == 0 || strcmp(arg_list[k], "executable") == 0 )
             {
-                t_data.args[t_data.n_args].value = NULL;
+                args[n_args].value = NULL;
             }else{
                 k++;
-                t_data.args[t_data.n_args].value = arg_list[k];
+                args[n_args].value = arg_list[k];
             }
-            t_data.n_args++;
+            n_args++;
         }
     }
     return t_data;
 }
 
-int main(int argc, char *argv[])
+void consome(char * path_consome) 
 {
-    T_DATA thread_data;
-    pthread_t thread_id;    
-    thread_data = read_command (argc, argv);
+    int j = 0;
+    DIR *dir;
+    struct dirent *entry;
+    char *path = malloc(sizeof(char) * 300);
+    struct stat file_stat;
 
-    pthread_create(&thread_id, NULL, &listDir, &thread_data);
-    pthread_join(thread_id, NULL);
+    if ((dir = opendir(path_consome)) == NULL)
+        perror("opendir() error");
+    else
+    {
+        while ((entry = readdir(dir)) != NULL)
+        {
+            sprintf(path, "%s%s", path_consome, entry->d_name);
 
-    print_occur();    
-    return 0;
+            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0 || strcmp(entry->d_name, ".DS_Store") == 0 || strcmp(entry->d_name, ".git") == 0)
+                continue;
+
+            if (stat(path, &file_stat) == 0)
+            {
+                for (j = 0; j < n_args; j++)
+                {
+                    if (!args[j].opt(entry, args[j].value, file_stat))
+                        break;
+                }
+
+                if(j == n_args)
+                {
+                    pthread_mutex_lock(&mutex);
+                        insert_occur(pthread_self(), path);
+                    pthread_mutex_unlock(&mutex);
+                }
+            }
+            strcpy(path, "");
+        }
+        closedir(dir);
+    }
 }
 
-void * listDir(void * param)
+int produz(int val) {
+    srandom(val);
+    int r = random() % 100;
+    return r;
+}
+
+char * listDir(void * param)
 {
     struct thread_data * my_data;
     my_data = (struct thread_data *) param;
 
-    T_DATA thread_data[20];
-    pthread_t thread_id[20];
+    T_DATA thread_data;
+    pthread_t thread_id;
     int i = 0, j = 0;
 
     DIR *dir;
@@ -282,33 +320,13 @@ void * listDir(void * param)
 
             if (stat(path, &file_stat) == 0)
             {
-                for (j = 0; j < my_data->n_args; j++)
-                {
-                    if (!my_data->args[j].opt(entry, my_data->args[j].value, file_stat))
-                        break;
-                }
-                //printf("j = %d\n",j);
-                //printf("my_data->n_args = %d\n",my_data->n_args);
-
-                if(j == my_data->n_args)
-                {
-                    pthread_mutex_lock(&mutex);
-                        insert_occur(pthread_self(), path);
-                    pthread_mutex_unlock(&mutex);
-                }
-
                 if(S_ISDIR(file_stat.st_mode))
                 {
                     path = strcat(path, "/");
 
-                    thread_data[i].base_path = malloc(sizeof(char) * 300);
-                    strcpy(thread_data[i].base_path, path);
-                    thread_data[i].n_args = my_data->n_args;
-                    for(int x = 0; x < my_data->n_args; x++)
-                    {
-                        thread_data[i].args[x] = my_data->args[x];
-                    }
-                    pthread_create(&thread_id[i], NULL, &listDir, &thread_data[i]);
+                    thread_data.base_path = malloc(sizeof(char) * 300);
+                    strcpy(thread_data.base_path, path);
+                    listDir(&thread_data);
                     i++;
                 }
             }
@@ -316,10 +334,89 @@ void * listDir(void * param)
         }
         closedir(dir);
     }
+}
 
-    for(int x = 0; x < i; x++)
-        pthread_join(thread_id[x], NULL);
-    pthread_exit(NULL);
+void * produtor(void * param)
+{
+    struct thread_data *my_data;
+    my_data = (struct thread_data *) param;
+
+    while(1)
+    {
+        //pode ser o diretorio
+        int item =  produz(my_data->val);
+
+        semaphore_wait(semPodeProd);
+            pthread_mutex_lock(&trinco_p);
+                buf[prodptr] = item;
+                prodptr = (prodptr + 1) % N;
+            pthread_mutex_unlock(&trinco_p);
+        semaphore_signal(semPodeCons);
+    }
+
+}
+
+
+void * consumidor(void * param)
+{
+    char* item;
+    while(1)
+    {
+         semaphore_wait(semPodeCons);
+            pthread_mutex_lock(&trinco_c);
+                item = buf[consptr];
+                buf[consptr] = -1;
+                prodptr = (prodptr + 1) % N;
+            pthread_mutex_unlock(&trinco_c);
+        semaphore_signal(semPodeProd);
+
+        // verificar todas as ocorrencias do diretorio
+        consome(item);
+    }
+}
+
+void * print_state(void * unused)
+{
+    int i = 0;
+    while(TRUE){
+        pthread_mutex_lock(&trinco_c);
+        pthread_mutex_lock(&trinco_p);
+
+            for(i = 0;i < N; i++)
+                printf("%s ", buf[i]);
+        printf("\n");
+
+        pthread_mutex_unlock(&trinco_p);
+        pthread_mutex_unlock(&trinco_c);
+        sleep(2);
+
+        fflush(stdout);
+    }
+}
+
+int main(int argc, char *argv[])
+{
+    struct thread_data th_data_array_prod;
+    struct thread_data th_data_array_cons[NCons];
+
+    pthread_t tid_state;
+    pthread_t thread_id;
+
+    th_data_array_prod = read_command (argc, argv);
+
+    semaphore_create(mach_task_self(), &semPodeProd, SYNC_POLICY_FIFO, N);
+    semaphore_create(mach_task_self(), &semPodeCons, SYNC_POLICY_FIFO, 0);
+
+    pthread_create(&thread_id, NULL, &produtor, &th_data_array_prod);
+    
+
+    for(int i=0;i<NCons;i++)
+        pthread_create(&thread_id, NULL, &consumidor, NULL);
+
+    pthread_create(&tid_state, NULL, &print_state, NULL);
+    pthread_join(tid_state, NULL);
+
+    return 0;
 }
 
 void remove_all_chars(char* str, char c) {
