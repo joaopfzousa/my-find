@@ -465,14 +465,13 @@ void * consumidor(void * param)
          semaphore_wait(semPodeCons);
             pthread_mutex_lock(&trinco_c);
                 item = buf[consptr];
-                printf("item = %s\n", item);
                 buf[consptr] = NULL;
                 consptr = (consptr + 1) % N;
                 printf("consptr = %d\n", consptr);
             pthread_mutex_unlock(&trinco_c);
         semaphore_signal(semPodeProd);
 
-        //printf("item = %s\n", item);
+        printf("item = %s\n", item);
 
         if(strcmp(item, "") == 0)
         {
@@ -528,7 +527,7 @@ int main(int argc, char *argv[])
     struct thread_data th_data_array_prod;
     struct thread_data th_data_array_cons[NCons];
 
-    pthread_t tid_state;
+    //pthread_t tid_state;
 
     if(strcmp(".", argv[1]) == 0)
     {

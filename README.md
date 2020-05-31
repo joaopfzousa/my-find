@@ -49,5 +49,23 @@ Opções que devem considerar:
     ● -size +5M: procura os ficheiros com mais ou menos que x tamanho (megas)
 
 
+## Correr o projeto
+
+###  Correr my-find.c
+
+```bash
+gcc my-find.c -o my-find.out
+
+./my-find.out  <caminho> <filtro> <value>
+```
+
+###  Correr find_prod_cons-prod.c
+
+```bash
+gcc ./my-find_prod_cons.c -o my_find-prod.out
+
+./my_find-prod.out <caminho> <filtro> <value>
+```
+
 ## License
 [MIT](https://choosealicense.com/licenses/mit/)
