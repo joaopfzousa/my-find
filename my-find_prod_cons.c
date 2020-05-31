@@ -3,7 +3,6 @@
 #include <errno.h>
 #include <sys/types.h>
 #undef _POSIX_SOURCE
-
 #include <pthread.h>
 #include <mach/mach_init.h>
 #include <mach/semaphore.h>
@@ -21,10 +20,8 @@
 #define MAX_CMD 100
 #define TRUE 1
 
-
-
-
-void * listDir(void * param);
+//./my_find-prod.out /Users/joaopfzousa/Documents/Faculdade/SO/ -type d
+void produz(char * param);
 void remove_all_chars(char* str, char c);
 
 typedef int (*PARAM)(struct dirent * entry, char * value, struct stat file_stat);
@@ -35,6 +32,7 @@ typedef struct arg {
 }ARG;
 
 typedef struct thread_data {
+    pthread_t  thread_id;
     char * base_path;
 }T_DATA;
 
@@ -67,6 +65,15 @@ semaphore_t semPodeProd;
 
 static const char *semNameCons = "semPodeCons";
 semaphore_t semPodeCons;
+
+PATHS * aloc_memory_path(char* path)
+{
+    PATHS* new = (PATHS*) malloc(sizeof(PATHS));
+    new->pnext = NULL;
+    new->base_path = (char *) malloc(sizeof(char) * strlen(path));
+    strcpy(new->base_path, path);
+   return new;
+}
 
 void insert_occur(pthread_t thread, char* path)
 {
@@ -113,15 +120,14 @@ void insert_occur(pthread_t thread, char* path)
     temp->pnext = new_occur;
 }
 
-PATHS * aloc_memory_path(char* path)
+char *strupr(char *nome_ficheiro) 
 {
-    PATHS* new = (PATHS*) malloc(sizeof(PATHS));
-    new->pnext = NULL;
-    new->base_path = (char *) malloc(sizeof(char) * strlen(path));
-    strcpy(new->base_path, path);
-   return new;
+    for (int i = 0; i < strlen(nome_ficheiro); i++) 
+    {
+        nome_ficheiro[i] = toupper(nome_ficheiro[i]);
+    }
+    return nome_ficheiro;
 }
-
 
 int name (struct dirent * entry, char * value, struct stat file_stat)
 {
@@ -153,11 +159,14 @@ int type (struct dirent * entry, char * value, struct stat file_stat)
 
 int iname (struct dirent * entry, char * value, struct stat file_stat) 
 {
-    printf("Find by iname: %s\n", value);
+    char *nome_ficheiro;
+    strcpy(nome_ficheiro, strupr(entry->d_name));
+    strcpy(value, strupr(value));
 
-    //todo
-
-    return 1; // return 1 if match found
+    if (strstr(nome_ficheiro, value) != NULL) {
+        return 1;
+    }
+    return 0; // return 1 if match found
 }
 
 int empty (struct dirent * entry, char * value, struct stat file_stat) 
@@ -189,11 +198,16 @@ int executable (struct dirent * entry, char * value, struct stat file_stat)
 
 int mmin (struct dirent * entry, char * value, struct stat file_stat) 
 {
-    printf("Find by mmin: %s\n", value);
+    int min = atoi(value);
+    struct timespec timespec;
 
-    //todo
-
-    return 1; // return 1 if match found
+    int timeAux = timespec.tv_sec;
+    timeAux *= 60;
+    if (min >= timeAux) {
+        return 1; // return 1 if match found
+    } else {
+        return 0; // return 0 if match not found
+    }
 }
 
 int size (struct dirent * entry, char * value, struct stat file_stat) 
@@ -205,14 +219,10 @@ int size (struct dirent * entry, char * value, struct stat file_stat)
     return 1; // return 1 if match found
 }
 
-T_DATA read_command(int n_args, char **arg_list)
+void read_command(int argc, char **arg_list)
 {
-    T_DATA t_data;
-
-    t_data.base_path = malloc(sizeof(char) * 300);
-    t_data.base_path = arg_list[1];
-
-    for(int k = 2; k < n_args; k++)
+    int k;
+    for(k = 2; k < argc; k++)
     {
         if(strcmp(arg_list[k], "-name") == 0 || strcmp(arg_list[k], "-iname") == 0 || strcmp(arg_list[k], "-type") == 0 || strcmp(arg_list[k], "-empty") == 0|| strcmp(arg_list[k], "-executable") == 0 || strcmp(arg_list[k], "-mmin") == 0 || strcmp(arg_list[k], "-size") == 0)
         {
@@ -244,7 +254,6 @@ T_DATA read_command(int n_args, char **arg_list)
             n_args++;
         }
     }
-    return t_data;
 }
 
 void consome(char * path_consome) 
@@ -255,8 +264,10 @@ void consome(char * path_consome)
     char *path = malloc(sizeof(char) * 300);
     struct stat file_stat;
 
+    printf("path_consome = %s\n", path_consome);
+
     if ((dir = opendir(path_consome)) == NULL)
-        perror("opendir() error");
+        perror("[CONSUMIDOR] -> opendir() error");
     else
     {
         while ((entry = readdir(dir)) != NULL)
@@ -287,19 +298,8 @@ void consome(char * path_consome)
     }
 }
 
-int produz(int val) {
-    srandom(val);
-    int r = random() % 100;
-    return r;
-}
-
-char * listDir(void * param)
+void produz(char * path_produtor)
 {
-    struct thread_data * my_data;
-    my_data = (struct thread_data *) param;
-
-    T_DATA thread_data;
-    pthread_t thread_id;
     int i = 0, j = 0;
 
     DIR *dir;
@@ -307,13 +307,15 @@ char * listDir(void * param)
     char *path = malloc(sizeof(char) * 300);
     struct stat file_stat;
 
-    if ((dir = opendir(my_data->base_path)) == NULL)
-        perror("opendir() error");
-    else
+    //printf("path produz= %s\n", path_produtor);
+
+    if ((dir = opendir(path_produtor)) == NULL)
+        perror("[PRODUTOR] -> opendir() error");
+    else 
     {
         while ((entry = readdir(dir)) != NULL)
         {
-            sprintf(path, "%s%s", my_data->base_path, entry->d_name);
+            sprintf(path, "%s%s", path_produtor, entry->d_name);
 
             if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0 || strcmp(entry->d_name, ".DS_Store") == 0 || strcmp(entry->d_name, ".git") == 0)
                 continue;
@@ -324,9 +326,17 @@ char * listDir(void * param)
                 {
                     path = strcat(path, "/");
 
-                    thread_data.base_path = malloc(sizeof(char) * 300);
-                    strcpy(thread_data.base_path, path);
-                    listDir(&thread_data);
+                    //printf("path  dir = %s\n", path);
+
+                    semaphore_wait(semPodeProd);
+                        pthread_mutex_lock(&trinco_p);
+                            buf[prodptr] = path;
+                            printf("buf[prodptr] = %s\n", buf[prodptr]); 
+                            prodptr = (prodptr + 1) % N;
+                        pthread_mutex_unlock(&trinco_p);
+                    semaphore_signal(semPodeCons);
+                    
+                    produz(path);
                     i++;
                 }
             }
@@ -341,21 +351,26 @@ void * produtor(void * param)
     struct thread_data *my_data;
     my_data = (struct thread_data *) param;
 
-    while(1)
-    {
-        //pode ser o diretorio
-        int item =  produz(my_data->val);
+    //printf("path produtor = %s\n", my_data->base_path);
 
+    produz(my_data->base_path);
+
+    /*
+    int i = 0;
+    while(i < NCons)
+    {
+        char* item =  "bomba";
         semaphore_wait(semPodeProd);
             pthread_mutex_lock(&trinco_p);
                 buf[prodptr] = item;
                 prodptr = (prodptr + 1) % N;
             pthread_mutex_unlock(&trinco_p);
         semaphore_signal(semPodeCons);
+        i++;
     }
-
+    */
+    pthread_exit(NULL);
 }
-
 
 void * consumidor(void * param)
 {
@@ -365,20 +380,32 @@ void * consumidor(void * param)
          semaphore_wait(semPodeCons);
             pthread_mutex_lock(&trinco_c);
                 item = buf[consptr];
-                buf[consptr] = -1;
-                prodptr = (prodptr + 1) % N;
+                buf[consptr] = NULL;
+                consptr = (consptr + 1) % N;
             pthread_mutex_unlock(&trinco_c);
         semaphore_signal(semPodeProd);
 
-        // verificar todas as ocorrencias do diretorio
-        consome(item);
+        printf("item = %s\n", item);
+        //consome(item);
+
+        if(strcmp(item, "") == 0)
+        {
+            printf("Item vazio\n");
+        }else if(strcmp(item, "bomba") == 0)
+        {
+            pthread_exit(NULL);
+        }else{
+            // verificar todas as ocorrencias do diretorio
+            consome(item);
+        }
     }
 }
 
 void * print_state(void * unused)
 {
     int i = 0;
-    while(TRUE){
+    while(TRUE)
+    {
         pthread_mutex_lock(&trinco_c);
         pthread_mutex_lock(&trinco_p);
 
@@ -394,34 +421,58 @@ void * print_state(void * unused)
     }
 }
 
+void print_occur()
+{
+    OCCUR *temp = &occurrences;
+
+    while(temp != NULL)
+    {
+        PATHS * temp_newPath = temp->pfirst;
+        while(temp_newPath != NULL)
+        {
+            printf("[%lu] -> %s\n", temp->thread_id, temp_newPath->base_path);
+            temp_newPath = temp_newPath->pnext;
+        }
+        temp = temp->pnext;
+    }
+}
+
 int main(int argc, char *argv[])
 {
     struct thread_data th_data_array_prod;
     struct thread_data th_data_array_cons[NCons];
 
     pthread_t tid_state;
-    pthread_t thread_id;
 
-    th_data_array_prod = read_command (argc, argv);
+    th_data_array_prod.base_path = argv[1];
+    read_command (argc, argv);
 
     semaphore_create(mach_task_self(), &semPodeProd, SYNC_POLICY_FIFO, N);
     semaphore_create(mach_task_self(), &semPodeCons, SYNC_POLICY_FIFO, 0);
 
-    pthread_create(&thread_id, NULL, &produtor, &th_data_array_prod);
-    
+    //thread produtor
+    pthread_create(&th_data_array_prod.thread_id, NULL, &produtor, &th_data_array_prod);
+   
+
 
     for(int i=0;i<NCons;i++)
-        pthread_create(&thread_id, NULL, &consumidor, NULL);
+        pthread_create(&th_data_array_cons[i].thread_id, NULL, &consumidor, NULL);
 
-    pthread_create(&tid_state, NULL, &print_state, NULL);
-    pthread_join(tid_state, NULL);
+    //pthread_create(&tid_state, NULL, &print_state, NULL);
+    //pthread_join(tid_state, NULL);
+
+    pthread_join(th_data_array_prod.thread_id, NULL);
+
+    print_occur();
 
     return 0;
 }
 
-void remove_all_chars(char* str, char c) {
+void remove_all_chars(char* str, char c) 
+{
     char *pr = str, *pw = str;
-    while (*pr) {
+    while (*pr) 
+    {
         *pw = *pr++;
         pw += (*pw != c);
     }
