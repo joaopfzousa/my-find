@@ -204,8 +204,16 @@ T_DATA read_command(int n_args, char **arg_list)
 {
     T_DATA t_data = { .args={NULL, ""}, .n_args=0 };
 
-    t_data.base_path = malloc(sizeof(char) * 300);
-    t_data.base_path = arg_list[1];
+    if(strcmp(".", arg_list[1]) == 0)
+    {
+        t_data.base_path = malloc(sizeof(char) * 300);
+        getcwd(t_data.base_path, sizeof(t_data.base_path));
+        strcat(t_data.base_path, "/");
+    }else{
+        t_data.base_path = malloc(sizeof(char) * 300);
+        t_data.base_path = arg_list[1];
+    }
+    
 
     for(int k = 2; k < n_args; k++)
     {

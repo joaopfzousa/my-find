@@ -264,7 +264,7 @@ void consome(char * path_consome)
     char *path = malloc(sizeof(char) * 300);
     struct stat file_stat;
 
-    printf("path_consome = %s\n", path_consome);
+    printf("Path consome = %s\n\n", path_consome);
 
     if ((dir = opendir(path_consome)) == NULL)
         perror("[CONSUMIDOR] -> opendir() error");
@@ -331,8 +331,9 @@ void produz(char * path_produtor)
                     semaphore_wait(semPodeProd);
                         pthread_mutex_lock(&trinco_p);
                             buf[prodptr] = path;
-                            printf("buf[prodptr] = %s\n", buf[prodptr]); 
+                            printf("PRODUZ : buf[prodptr] = %s\n", buf[prodptr]); 
                             prodptr = (prodptr + 1) % N;
+                            printf("produz prodptr = %d\n", prodptr);
                         pthread_mutex_unlock(&trinco_p);
                     semaphore_signal(semPodeCons);
                     
@@ -355,7 +356,6 @@ void * produtor(void * param)
 
     produz(my_data->base_path);
 
-    /*
     int i = 0;
     while(i < NCons)
     {
@@ -364,11 +364,12 @@ void * produtor(void * param)
             pthread_mutex_lock(&trinco_p);
                 buf[prodptr] = item;
                 prodptr = (prodptr + 1) % N;
+                printf("produtor prodptr = %d\n", prodptr);
             pthread_mutex_unlock(&trinco_p);
         semaphore_signal(semPodeCons);
         i++;
     }
-    */
+    
     pthread_exit(NULL);
 }
 
@@ -380,13 +381,14 @@ void * consumidor(void * param)
          semaphore_wait(semPodeCons);
             pthread_mutex_lock(&trinco_c);
                 item = buf[consptr];
+                printf("item = %s\n", item);
                 buf[consptr] = NULL;
                 consptr = (consptr + 1) % N;
+                printf("consptr = %d\n", consptr);
             pthread_mutex_unlock(&trinco_c);
         semaphore_signal(semPodeProd);
 
-        printf("item = %s\n", item);
-        //consome(item);
+        //printf("item = %s\n", item);
 
         if(strcmp(item, "") == 0)
         {
@@ -444,7 +446,16 @@ int main(int argc, char *argv[])
 
     pthread_t tid_state;
 
-    th_data_array_prod.base_path = argv[1];
+    if(strcmp(".", argv[1]) == 0)
+    {
+        th_data_array_prod.base_path = malloc(sizeof(char) * 300);
+        getcwd(th_data_array_prod.base_path, sizeof(th_data_array_prod.base_path));
+        strcat(th_data_array_prod.base_path, "/");
+    }else{
+        th_data_array_prod.base_path = malloc(sizeof(char) * 300);
+        th_data_array_prod.base_path = argv[1];
+    }
+
     read_command (argc, argv);
 
     semaphore_create(mach_task_self(), &semPodeProd, SYNC_POLICY_FIFO, N);
@@ -453,7 +464,6 @@ int main(int argc, char *argv[])
     //thread produtor
     pthread_create(&th_data_array_prod.thread_id, NULL, &produtor, &th_data_array_prod);
    
-
 
     for(int i=0;i<NCons;i++)
         pthread_create(&th_data_array_cons[i].thread_id, NULL, &consumidor, NULL);
