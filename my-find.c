@@ -117,9 +117,39 @@ void print_occur()
     }
 }
 
+char *strupr(char *nome_ficheiro) 
+{
+    for (int i = 0; i < strlen(nome_ficheiro); i++) 
+    {
+        nome_ficheiro[i] = toupper(nome_ficheiro[i]);
+    }
+    return nome_ficheiro;
+}
 
 int name (struct dirent * entry, char * value, struct stat file_stat)
 {
+    char * value_last_c = NULL;
+
+    char * entry_last_C = NULL;
+
+    if (value[0] == '*') 
+    {
+        char c = value[1];
+
+        if ((strrchr(value, c)) != NULL && strrchr(entry->d_name, c) != NULL) 
+        {
+            value_last_c = strrchr(value, c);
+            entry_last_C = strrchr(entry->d_name, c);
+
+            if ((strcmp(value_last_c, entry_last_C) == 0)) 
+            {
+                return 1; // return 1 if match found
+            } else {
+                return 0; // return 1 if match not found
+            }
+        }
+    }
+
     if(strstr(value , entry->d_name) != NULL)
     {
         return 1; // return 1 if match found
@@ -148,17 +178,44 @@ int type (struct dirent * entry, char * value, struct stat file_stat)
 
 int iname (struct dirent * entry, char * value, struct stat file_stat) 
 {
-    printf("Find by iname: %s\n", value);
+    char * value_last_c = NULL;
 
-    //todo
+    char * entry_last_c = NULL;
 
-    return 1; // return 1 if match found
+    char * valueU = strupr(value);
+
+    char * entryU = strupr(entry->d_name);
+
+    if (value[0] == '*') 
+    {
+        char c = value[1];
+
+        if ((strrchr(valueU, c)) != NULL && strrchr(entryU, c) != NULL) 
+        {
+            value_last_c = strrchr(valueU, c);
+            entry_last_c = strrchr(entryU, c);
+
+            if ((strcmp(value_last_c, entry_last_c) == 0)) 
+            {
+                return 1; // return 1 if match found
+            } else {
+                return 0; // return 0 if match found
+            }
+        }
+    }
+
+    if ((strstr(entryU, valueU)) != NULL) 
+    {
+        return 1; // return 1 if match found
+    }
+    return 0; // return 0 if match found
 }
 
 int empty (struct dirent * entry, char * value, struct stat file_stat) 
 {
     //printf("Find by empty: %s\n", value);
-     if(S_ISDIR(file_stat.st_mode)){
+    if(S_ISDIR(file_stat.st_mode))
+    {
         if(file_stat.st_size == 64)
         {
             return 1; // return 1 if match found
@@ -178,26 +235,69 @@ int executable (struct dirent * entry, char * value, struct stat file_stat)
     {
         return 1; // return 1 if match found
     }
-
     return 0; // return 0 if match not found
 }
 
 int mmin (struct dirent * entry, char * value, struct stat file_stat) 
 {
-    printf("Find by mmin: %s\n", value);
+    int min = atoi(value);
+    struct timespec timespec;
 
-    //todo
-
-    return 1; // return 1 if match found
+    int timeAux = timespec.tv_sec;
+    timeAux *= 60;
+    if (min >= timeAux) {
+        return 1; // return 1 if match found
+    } else {
+        return 0; // return 0 if match not found
+    }
 }
 
 int size (struct dirent * entry, char * value, struct stat file_stat) 
 {
-    printf("Find by size: %s\n", value);
+    double result = 0;
+    char type_size[2];
+    int aux = 0;
 
-    //todo
+    for (int i = 1; value[i] != '\0'; i++) 
+    {
+        if (value[i] >= '0' && value[i] <= '9') 
+        {
+            result = (result * 10) + (value[i] - '0');
+        } else {
+            type_size[aux] = toupper(value[i]);
+            aux++;
+        }
+    }
 
-    return 1; // return 1 if match found
+    if (strcmp(type_size, "KB") == 0) 
+    {
+        if (value[0] == '+' && (file_stat.st_size / 1024) > result) 
+        {
+            return 1; // return 1 if match found
+        } else if (value[0] == '-' && (file_stat.st_size / 1024) < result) 
+        {
+            return 1; // return 1 if match found
+        }
+    } else if (strcmp(type_size, "MB") == 0) 
+    {
+        if (value[0] == '+' && (file_stat.st_size / 1024) > result) 
+        {
+            return 1; // return 1 if match found
+        } else if (value[0] == '-' && (file_stat.st_size / 1024) < result) 
+        {
+            return 1; // return 1 if match found
+        }
+    } else if (strcmp(type_size, "B") == 0)
+    {
+        if (file_stat.st_size > result) 
+        {
+            return 1; // return 1 if match found
+        } else if (file_stat.st_size < result) 
+        {
+            return 1; // return 1 if match found
+        }
+    }
+    return 0; // return 0 if match not found
 }
 
 T_DATA read_command(int n_args, char **arg_list)
