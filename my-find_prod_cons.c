@@ -348,7 +348,7 @@ void consome(char * path_consome)
     char *path = malloc(sizeof(char) * 300);
     struct stat file_stat;
 
-    printf("Path consome = %s\n\n", path_consome);
+    //printf("Path consome = %s\n\n", path_consome);
 
     if ((dir = opendir(path_consome)) == NULL)
         perror("[CONSUMIDOR] -> opendir() error");
@@ -414,10 +414,12 @@ void produz(char * path_produtor)
 
                     semaphore_wait(semPodeProd);
                         pthread_mutex_lock(&trinco_p);
-                            buf[prodptr] = path;
-                            printf("PRODUZ : buf[prodptr] = %s\n", buf[prodptr]); 
+                            buf[prodptr] = (char*)malloc(sizeof(char)*strlen(path));
+                            strcpy(buf[prodptr], path);
+                            //buf[prodptr] = path;
+                            //printf("PRODUZ : buf[prodptr] = %s\n", buf[prodptr]); 
                             prodptr = (prodptr + 1) % N;
-                            printf("produz prodptr = %d\n", prodptr);
+                            //printf("produz prodptr = %d\n", prodptr);
                         pthread_mutex_unlock(&trinco_p);
                     semaphore_signal(semPodeCons);
                     
@@ -438,20 +440,28 @@ void * produtor(void * param)
 
     //printf("path produtor = %s\n", my_data->base_path);
 
-    produz(my_data->base_path);
+    semaphore_wait(semPodeProd);
+            pthread_mutex_lock(&trinco_p);
+                buf[prodptr] = (char*) malloc(sizeof(char) * strlen(my_data->base_path));
+                strcpy(buf[prodptr], my_data->base_path);
+                //buf[prodptr] = my_data->base_path;
+                prodptr = (prodptr + 1) % N;
+                //printf("produtor prodptr = %d\n", prodptr);
+            pthread_mutex_unlock(&trinco_p);
+        semaphore_signal(semPodeCons);
 
-    int i = 0;
-    while(i < NCons)
+    produz(my_data->base_path);
+    
+    for(int i = 0; i < NCons; i++)
     {
         char* item =  "bomba";
         semaphore_wait(semPodeProd);
             pthread_mutex_lock(&trinco_p);
                 buf[prodptr] = item;
                 prodptr = (prodptr + 1) % N;
-                printf("produtor prodptr = %d\n", prodptr);
+                //printf("produtor prodptr = %d\n", prodptr);
             pthread_mutex_unlock(&trinco_p);
         semaphore_signal(semPodeCons);
-        i++;
     }
     
     pthread_exit(NULL);
@@ -467,13 +477,13 @@ void * consumidor(void * param)
                 item = buf[consptr];
                 buf[consptr] = NULL;
                 consptr = (consptr + 1) % N;
-                printf("consptr = %d\n", consptr);
+                //printf("consptr = %d\n", consptr);
             pthread_mutex_unlock(&trinco_c);
         semaphore_signal(semPodeProd);
 
         printf("item = %s\n", item);
 
-        if(strcmp(item, "") == 0)
+        if(item == NULL || strcmp(item, "") == 0)
         {
             printf("Item vazio\n");
         }else if(strcmp(item, "bomba") == 0)
@@ -553,9 +563,13 @@ int main(int argc, char *argv[])
 
     //pthread_create(&tid_state, NULL, &print_state, NULL);
     //pthread_join(tid_state, NULL);
-
+    
     pthread_join(th_data_array_prod.thread_id, NULL);
 
+    for(int i=0;i<NCons;i++)
+        pthread_join(th_data_array_cons[i].thread_id, NULL);
+
+    printf("\n\nOcurrências : \n\n");
     print_occur();
 
     return 0;
