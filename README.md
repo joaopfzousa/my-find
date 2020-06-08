@@ -67,5 +67,13 @@ gcc ./my-find_prod_cons.c -o my_find-prod.out
 ./my_find-prod.out <caminho> <filtro> <value>
 ```
 
+###  Correr find_prod_cons-prod_d.c
+
+```bash
+gcc ./my-find_prod_cons_d.c -o my_find-prod_d.out
+
+./my_find-prod_d.out <caminho> <filtro> <value>
+```
+
 ## License
 [MIT](https://choosealicense.com/licenses/mit/)

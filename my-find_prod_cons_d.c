@@ -15,7 +15,7 @@
 #include <ctype.h>
 
 #define N 10
-#define NProds 1
+#define NProds 5
 #define NCons 6
 #define MAX_CMD 100
 #define TRUE 1
@@ -52,19 +52,40 @@ char *buf[N];
 int prodptr=0, consptr=0;
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t trinco_p = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t trinco_c = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t nProdutores = PTHREAD_MUTEX_INITIALIZER;
+
 OCCUR  occurrences = {.thread_id = NULL, .pnext = NULL, .pfirst = NULL, .n_paths = 0};
 
 ARG args[5];
 int n_args;
-
-pthread_mutex_t trinco_p = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t trinco_c = PTHREAD_MUTEX_INITIALIZER;
 
 static const char *semNameProd = "semPodeProd";
 semaphore_t semPodeProd;
 
 static const char *semNameCons = "semPodeCons";
 semaphore_t semPodeCons;
+
+int contDir = 0, nBombas = 0;
+char * directorios[200];
+
+int verificaDir(char* diretorio)
+{
+	int i;
+	for (i=0;i<contDir;i++)
+	{
+		if (strcmp(diretorio, directorios[i])==0)
+		{
+			return 1;
+		}
+	}	
+	directorios[i] = (char *) malloc(sizeof(char) * strlen(diretorio) + 1);
+	strcpy(directorios[i], diretorio);
+	contDir++;
+
+	return 0;
+}
 
 PATHS * aloc_memory_path(char* path)
 {
@@ -384,7 +405,7 @@ void consome(char * path_consome)
 
 void produz(char * path_produtor)
 {
-    int i = 0, j = 0;
+    int j = 0, existedir;
 
     DIR *dir;
     struct dirent *entry;
@@ -411,20 +432,30 @@ void produz(char * path_produtor)
                     path = strcat(path, "/");
 
                     //printf("path  dir = %s\n", path);
+                    if (NProds>1)
+                    {
+                        pthread_mutex_lock(&nProdutores);
+                            existedir = verificaDir(path);
+                        pthread_mutex_unlock(&nProdutores);
+                    } else {
+                        existedir = 0;
+                    }
 
-                    semaphore_wait(semPodeProd);
-                        pthread_mutex_lock(&trinco_p);
-                            buf[prodptr] = (char*)malloc(sizeof(char)*strlen(path));
-                            strcpy(buf[prodptr], path);
-                            //buf[prodptr] = path;
-                            //printf("PRODUZ : buf[prodptr] = %s\n", buf[prodptr]); 
-                            prodptr = (prodptr + 1) % N;
-                            //printf("produz prodptr = %d\n", prodptr);
-                        pthread_mutex_unlock(&trinco_p);
-                    semaphore_signal(semPodeCons);
-                    
+                    if (existedir == 0)
+				    {   
+
+                        semaphore_wait(semPodeProd);
+                            pthread_mutex_lock(&trinco_p);
+                                buf[prodptr] = (char*)malloc(sizeof(char)*strlen(path));
+                                strcpy(buf[prodptr], path);
+                                //buf[prodptr] = path;
+                                //printf("PRODUZ : buf[prodptr] = %s\n", buf[prodptr]); 
+                                prodptr = (prodptr + 1) % N;
+                                //printf("produz prodptr = %d\n", prodptr);
+                            pthread_mutex_unlock(&trinco_p);
+                        semaphore_signal(semPodeCons);
+                    }
                     produz(path);
-                    i++;
                 }
             }
             strcpy(path, "");
@@ -437,10 +468,21 @@ void * produtor(void * param)
 {
     struct thread_data *my_data;
     my_data = (struct thread_data *) param;
-
+    int existedir=0;
     //printf("path produtor = %s\n", my_data->base_path);
 
-    semaphore_wait(semPodeProd);
+    if (NProds>1)
+    {
+        pthread_mutex_lock(&nProdutores);
+            existedir = verificaDir(my_data->base_path);
+        pthread_mutex_unlock(&nProdutores);
+    }else {
+        existedir = 0;
+    }
+
+    if (existedir == 0)
+    {  
+        semaphore_wait(semPodeProd);
             pthread_mutex_lock(&trinco_p);
                 buf[prodptr] = (char*) malloc(sizeof(char) * strlen(my_data->base_path));
                 strcpy(buf[prodptr], my_data->base_path);
@@ -449,22 +491,24 @@ void * produtor(void * param)
                 //printf("produtor prodptr = %d\n", prodptr);
             pthread_mutex_unlock(&trinco_p);
         semaphore_signal(semPodeCons);
+    }
 
     produz(my_data->base_path);
     
-    for(int i = 0; i < NCons; i++)
+    char* item =  "bomba";
+    while(nBombas < NCons)
     {
-        char* item =  "bomba";
         semaphore_wait(semPodeProd);
             pthread_mutex_lock(&trinco_p);
-                buf[prodptr] = (char*) malloc(sizeof(char) * strlen(item));
+                buf[prodptr] = (char*)malloc(sizeof(char) * strlen(item) + 1);
                 strcpy(buf[prodptr], item);
                 prodptr = (prodptr + 1) % N;
                 //printf("produtor prodptr = %d\n", prodptr);
+                nBombas++;
             pthread_mutex_unlock(&trinco_p);
         semaphore_signal(semPodeCons);
     }
-    
+
     pthread_exit(NULL);
 }
 
@@ -536,20 +580,10 @@ void print_occur()
 
 int main(int argc, char *argv[])
 {
-    struct thread_data th_data_array_prod;
+    struct thread_data th_data_array_prod[NProds];
     struct thread_data th_data_array_cons[NCons];
 
     //pthread_t tid_state;
-
-    if(strcmp(".", argv[1]) == 0)
-    {
-        th_data_array_prod.base_path = malloc(sizeof(char) * 300);
-        getcwd(th_data_array_prod.base_path, sizeof(th_data_array_prod.base_path));
-        strcat(th_data_array_prod.base_path, "/");
-    }else{
-        th_data_array_prod.base_path = malloc(sizeof(char) * 300);
-        th_data_array_prod.base_path = argv[1];
-    }
 
     read_command (argc, argv);
 
@@ -557,16 +591,28 @@ int main(int argc, char *argv[])
     semaphore_create(mach_task_self(), &semPodeCons, SYNC_POLICY_FIFO, 0);
 
     //thread produtor
-    pthread_create(&th_data_array_prod.thread_id, NULL, &produtor, &th_data_array_prod);
-   
+    for(int i=0;i<NProds;i++)
+    {
+        if(strcmp(".", argv[1]) == 0)
+        {
+            th_data_array_prod[i].base_path = malloc(sizeof(char) * 300);
+            getcwd(th_data_array_prod[i].base_path, sizeof(th_data_array_prod[i].base_path));
+            strcat(th_data_array_prod[i].base_path, "/");
+        }else{
+            th_data_array_prod[i].base_path = malloc(sizeof(char) * 300);
+            th_data_array_prod[i].base_path = argv[1];
+        }
+        pthread_create(&th_data_array_prod[i].thread_id, NULL, &produtor, &th_data_array_prod[i]);
+    } 
 
     for(int i=0;i<NCons;i++)
         pthread_create(&th_data_array_cons[i].thread_id, NULL, &consumidor, NULL);
 
     //pthread_create(&tid_state, NULL, &print_state, NULL);
     //pthread_join(tid_state, NULL);
-    
-    pthread_join(th_data_array_prod.thread_id, NULL);
+
+    for(int i=0;i<NProds;i++)
+        pthread_join(th_data_array_prod[i].thread_id, NULL);
 
     for(int i=0;i<NCons;i++)
         pthread_join(th_data_array_cons[i].thread_id, NULL);
