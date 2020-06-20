@@ -328,6 +328,7 @@ void read_command(int argc, char **arg_list)
             }else if(strcmp(arg_list[k], "size") == 0){
                 args[n_args].opt = (PARAM) size;
             }
+
             if(strcmp(arg_list[k], "empty") == 0 || strcmp(arg_list[k], "executable") == 0 )
             {
                 args[n_args].value = NULL;
@@ -335,6 +336,7 @@ void read_command(int argc, char **arg_list)
                 k++;
                 args[n_args].value = arg_list[k];
             }
+            
             n_args++;
         }
     }
@@ -441,14 +443,14 @@ void * produtor(void * param)
     //printf("path produtor = %s\n", my_data->base_path);
 
     semaphore_wait(semPodeProd);
-            pthread_mutex_lock(&trinco_p);
-                buf[prodptr] = (char*) malloc(sizeof(char) * strlen(my_data->base_path));
-                strcpy(buf[prodptr], my_data->base_path);
-                //buf[prodptr] = my_data->base_path;
-                prodptr = (prodptr + 1) % N;
-                //printf("produtor prodptr = %d\n", prodptr);
-            pthread_mutex_unlock(&trinco_p);
-        semaphore_signal(semPodeCons);
+        pthread_mutex_lock(&trinco_p);
+            buf[prodptr] = (char*) malloc(sizeof(char) * strlen(my_data->base_path));
+            strcpy(buf[prodptr], my_data->base_path);
+            //buf[prodptr] = my_data->base_path;
+            prodptr = (prodptr + 1) % N;
+            //printf("produtor prodptr = %d\n", prodptr);
+        pthread_mutex_unlock(&trinco_p);
+    semaphore_signal(semPodeCons);
 
     produz(my_data->base_path);
     
