@@ -54,7 +54,7 @@ int prodptr=0, consptr=0;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 OCCUR  occurrences = {.thread_id = NULL, .pnext = NULL, .pfirst = NULL, .n_paths = 0};
 
-ARG args[5];
+ARG args[7];
 int n_args;
 
 pthread_mutex_t trinco_p = PTHREAD_MUTEX_INITIALIZER;

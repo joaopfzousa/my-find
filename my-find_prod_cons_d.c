@@ -405,7 +405,7 @@ void consome(char * path_consome)
 
 void produz(char * path_produtor)
 {
-    int j = 0, existedir;
+    int j = 0, existedir = 0;
 
     DIR *dir;
     struct dirent *entry;
@@ -432,18 +432,15 @@ void produz(char * path_produtor)
                     path = strcat(path, "/");
 
                     //printf("path  dir = %s\n", path);
-                    if (NProds>1)
+                    if (NProds > 1)
                     {
                         pthread_mutex_lock(&nProdutores);
                             existedir = verificaDir(path);
                         pthread_mutex_unlock(&nProdutores);
-                    } else {
-                        existedir = 0;
                     }
 
                     if (existedir == 0)
 				    {   
-
                         semaphore_wait(semPodeProd);
                             pthread_mutex_lock(&trinco_p);
                                 buf[prodptr] = (char*)malloc(sizeof(char)*strlen(path));
